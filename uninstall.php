@@ -1,0 +1,23 @@
+<?php
+
+/**
+ *
+ * This file runs when the plugin in uninstalled (deleted).
+ * This will not run when the plugin is deactivated.
+ * Ideally you will add all your clean-up scripts here
+ * that will clean-up unused meta, options, etc. in the database.
+ *
+ */
+
+// If plugin is not being uninstalled, exit (do nothing)
+if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+	exit;
+}
+
+// delete widget
+delete_option('widget_sig-show-pageview');
+
+// delete visit records
+global $wpdb;
+$sql = "DELETE FROM `".$wpdb->prefix."options` WHERE `option_name` like 'sig_ga_%'";
+$wpdb->query( $sql );
