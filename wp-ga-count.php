@@ -37,16 +37,19 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         $instance = wp_parse_args( (array) $instance, $defaults );
      ?>
       <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_account'); ?>">GA授權帳號：</label>
+        <label for="<?php echo $this->get_field_id('sig_ga_account'); ?>">GA授權服務帳號：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_account'); ?>" name="<?php echo $this->get_field_name('sig_ga_account'); ?>" value="<?php echo $instance['sig_ga_account']; ?>">
+        <small>到 <a href="https://console.developers.google.com/" target="_blank">Google Developers</a> 申請，並下載p12檔案。再把這個服務帳號加入 Google Analytics 你的站台管理員，權限要可檢視和分析。 </small>
       </p>
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_p12'); ?>">P12 key檔名：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_p12'); ?>" name="<?php echo $this->get_field_name('sig_ga_p12'); ?>" value="<?php echo $instance['sig_ga_p12']; ?>">
+        <small>檔案放在外掛的 p12 資料夾下。</small>
       </p>
       <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_id'); ?>">網站的GA id：</label>
+        <label for="<?php echo $this->get_field_id('sig_ga_id'); ?>">網站的 Profile ID：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_id'); ?>" name="<?php echo $this->get_field_name('sig_ga_id'); ?>" value="<?php echo $instance['sig_ga_id']; ?>">
+        <small>到你的 Google Analytics 中，切換到你的站台，在瀏覽器的URL應該是這樣子『https://www.google.com/analytics/web/#report/visitors-overview/a1234b23478970 p1234567/』，找最後 p 之後的數字1234567</small>
       </p>
 
     <?php
