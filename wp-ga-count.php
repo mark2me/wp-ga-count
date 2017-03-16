@@ -30,12 +30,17 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
     function form( $instance ) {
 
         $defaults = array(
+          'sig_ga_title'    => '參觀人氣',
           'sig_ga_account'   => '',
           'sig_ga_p12' => '',
           'sig_ga_id' => ''
         );
         $instance = wp_parse_args( (array) $instance, $defaults );
      ?>
+      <p>
+        <label for="<?php echo $this->get_field_id('sig_ga_title'); ?>">標題：</label>
+        <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_title'); ?>" name="<?php echo $this->get_field_name('sig_ga_title'); ?>" value="<?php echo $instance['sig_ga_title']; ?>">
+      </p>
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_account'); ?>">GA授權服務帳號：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_account'); ?>" name="<?php echo $this->get_field_name('sig_ga_account'); ?>" value="<?php echo $instance['sig_ga_account']; ?>">
@@ -58,6 +63,8 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
     function update( $new_instance, $old_instance ) {
 
         $instance = $old_instance;
+
+        $instance['sig_ga_title']      = strip_tags( $new_instance['sig_ga_title'] );
         $instance['sig_ga_account']    = strip_tags( $new_instance['sig_ga_account'] );
         $instance['sig_ga_p12']        = strip_tags( $new_instance['sig_ga_p12'] );
         $instance['sig_ga_id']         = strip_tags( $new_instance['sig_ga_id'] );
@@ -67,9 +74,11 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
     function widget( $args, $instance ) {
 
         extract( $args );
+
+        $sig_ga_title   = $instance['sig_ga_title'];
         $sig_ga_account = $instance['sig_ga_account'];
-        $sig_ga_p12 = $instance['sig_ga_p12'];
-        $sig_ga_id = $instance['sig_ga_id'];
+        $sig_ga_p12     = $instance['sig_ga_p12'];
+        $sig_ga_id      = $instance['sig_ga_id'];
 
         if( !empty($sig_ga_account) and !empty($sig_ga_p12) and !empty($sig_ga_id) )
         {
@@ -107,7 +116,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
 
           echo $before_widget;
-          echo $before_title . '參觀人氣' . $after_title;
+          echo $before_title . $sig_ga_title . $after_title;
           echo '<div>本日人氣：'.$today.'</div>';
           echo '<div>累積人氣：'.$all.'</div>';
 
@@ -128,7 +137,6 @@ function sig_register_ga_widget() {
 add_action( 'admin_enqueue_scripts', 'theme_name_scripts' );
 function theme_name_scripts() {
   wp_enqueue_style( 'chart', plugin_dir_url(__FILE__) . 'js/morris.css' );
-//  wp_enqueue_script('jquery');
   wp_enqueue_script( 'raphael', plugin_dir_url(__FILE__) . 'js/raphael-min.js',array('jquery') );
   wp_enqueue_script('chart', plugin_dir_url(__FILE__) . 'js/morris.min.js',array('jquery'));
 }
