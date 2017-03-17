@@ -3,14 +3,15 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.0
+Version: 1.0.1
 Author: Simon Chuang
 Author URI: http://webdesign.sig.tw
 
 */
 
 define( 'SIG_GA_DIR', dirname(__FILE__) );
-define( 'SIG_GA_KEY_PATH', SIG_GA_DIR.'/p12/');
+define( 'SIG_GA_KEY_PATH', SIG_GA_DIR.'/p12/');  //p12檔存放位置
+define( 'SIG_GA_CACHE', 600); //今日人氣暫存時間(秒數)
 
 /*-----------------------------------------------
 * add WP_Widget
@@ -31,9 +32,10 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
         $defaults = array(
           'sig_ga_title'    => '參觀人氣',
-          'sig_ga_account'   => '',
-          'sig_ga_p12' => '',
-          'sig_ga_id' => ''
+          'sig_ga_type'     => 0,
+          'sig_ga_account'  => '',
+          'sig_ga_p12'      => '',
+          'sig_ga_id'       => ''
         );
         $instance = wp_parse_args( (array) $instance, $defaults );
      ?>
@@ -57,6 +59,14 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         <small>到你的 Google Analytics 中，切換到你的站台，在瀏覽器的URL應該是這樣子『https://www.google.com/analytics/web/#report/visitors-overview/a1234b23478970 p1234567/』，找最後 p 之後的數字1234567</small>
       </p>
 
+      <p>
+        <label for="<?php echo $this->get_field_id('sig_ga_type'); ?>">顯示類型：</label>
+        <select class="widefat" size="1"  id="<?php echo $this->get_field_id('sig_ga_type'); ?>" name="<?php echo $this->get_field_name('sig_ga_type'); ?>">
+          <option value="0" <?php if($instance['sig_ga_type']==0) echo 'selected'?>>Visit</option>
+          <option value="1" <?php if($instance['sig_ga_type']==1) echo 'selected'?>>Pageview</option>
+        </select>
+      </p>
+
     <?php
     }
 
@@ -65,9 +75,16 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         $instance = $old_instance;
 
         $instance['sig_ga_title']      = strip_tags( $new_instance['sig_ga_title'] );
+        $instance['sig_ga_type']       = strip_tags( $new_instance['sig_ga_type'] );
         $instance['sig_ga_account']    = strip_tags( $new_instance['sig_ga_account'] );
         $instance['sig_ga_p12']        = strip_tags( $new_instance['sig_ga_p12'] );
         $instance['sig_ga_id']         = strip_tags( $new_instance['sig_ga_id'] );
+
+        // clear option table
+        global $wpdb;
+        $sql = "DELETE FROM `".$wpdb->prefix."options` WHERE `option_name` like 'sig_ga_%'";
+        $wpdb->query( $sql );
+
         return $instance;
     }
 
@@ -76,6 +93,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         extract( $args );
 
         $sig_ga_title   = $instance['sig_ga_title'];
+        $sig_ga_type    = $instance['sig_ga_type'];
         $sig_ga_account = $instance['sig_ga_account'];
         $sig_ga_p12     = $instance['sig_ga_p12'];
         $sig_ga_id      = $instance['sig_ga_id'];
@@ -91,12 +109,16 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
           }
           else
           {
-            if( (time() - $data['time']) > 3600 ){
+            if( (time() - $data['time']) > SIG_GA_CACHE ){
               $data = updata_today($instance,0);
             }
           }
 
-          $today = (isset($data['visit'])) ? $data['visit'] : 0;
+          if($sig_ga_type==1){
+            $today = (isset($data['pageview'])) ? $data['pageview'] : 0;
+          }else{
+            $today = (isset($data['visit'])) ? $data['visit'] : 0;
+          }
 
           //------ all --------
           $data = get_option('sig_ga_tol_'.$sig_ga_id);
@@ -112,7 +134,11 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
             }
           }
 
-          $all = (isset($data['visit'])) ? $data['visit'] : 0;
+          if($sig_ga_type==1){
+            $all = (isset($data['pageview'])) ? $data['pageview'] : 0;
+          }else{
+            $all = (isset($data['visit'])) ? $data['visit'] : 0;
+          }
 
 
           echo $before_widget;
@@ -279,8 +305,9 @@ function updata_today($instance,$new=1)
     if( is_object($ga) )
     {
       $option = array(
-        'visit' => $ga->getVisits(),
-        'time'  => time()
+        'pageview'  => $ga->getPageviews(),
+        'visit'     => $ga->getVisits(),
+        'time'      => time()
       );
 
       if($new){
@@ -316,9 +343,10 @@ function updata_tol($instance,$new=1)
     {
 
       $option = array(
-        'visit'   => $ga->getVisits(),
-        'start'   => $ga->getStartDate(),
-        'end'     => $ga->getEndDate()
+        'pageview'  => $ga->getPageviews(),
+        'visit'     => $ga->getVisits(),
+        'start'     => $ga->getStartDate(),
+        'end'       => $ga->getEndDate()
       );
 
       if($new){
