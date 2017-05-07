@@ -3,13 +3,14 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.0.1
+Version: 1.0.2
 Author: Simon Chuang
 Author URI: http://webdesign.sig.tw
 
 */
 
 define( 'SIG_GA_DIR', dirname(__FILE__) );
+define( 'SIG_GA_WIDGET', 'sig-show-pageview');   // widget dom id
 define( 'SIG_GA_KEY_PATH', SIG_GA_DIR.'/p12/');  //p12檔存放位置
 define( 'SIG_GA_CACHE', 600); //今日人氣暫存時間(秒數)
 
@@ -20,7 +21,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
     function __construct() {
       parent::__construct(
-      'sig-show-pageview', // 小工具ID
+        SIG_GA_WIDGET,
         __('顯示GA瀏覽人次統計', 'sig_ga_widget' ),
         array (
             'description' => '顯示參觀人次的統計數字'
@@ -38,6 +39,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
           'sig_ga_id'       => ''
         );
         $instance = wp_parse_args( (array) $instance, $defaults );
+
      ?>
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_title'); ?>">標題：</label>
@@ -82,7 +84,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
         // clear option table
         global $wpdb;
-        $sql = "DELETE FROM `".$wpdb->prefix."options` WHERE `option_name` like 'sig_ga_%'";
+        $sql = "DELETE FROM `".$wpdb->prefix."options` WHERE `option_name` like 'sig_ga_%_$instance[sig_ga_id]'";
         $wpdb->query( $sql );
 
         return $instance;
@@ -145,7 +147,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
           echo $before_title . $sig_ga_title . $after_title;
           echo '<div>本日人氣：'.$today.'</div>';
           echo '<div>累積人氣：'.$all.'</div>';
-
+          echo $after_widget;
         }
     }
 }
@@ -242,7 +244,9 @@ function add_ga_info_page() {
 
 function get_api($config=array(),$data)
 {
-  if(count($cinfig) <=0 ){
+
+  if( empty($config) )
+  {
     $w = new Sig_Ga_Count_Widget();
     $settings = $w->get_settings();
     $settings = reset($settings);
@@ -341,7 +345,6 @@ function updata_tol($instance,$new=1)
 
     if( is_object($ga) )
     {
-
       $option = array(
         'pageview'  => $ga->getPageviews(),
         'visit'     => $ga->getVisits(),
