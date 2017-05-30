@@ -3,7 +3,7 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.0.2
+Version: 1.1.0
 Author: Simon Chuang
 Author URI: http://webdesign.sig.tw
 
@@ -36,13 +36,14 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
           'sig_ga_type'     => 0,
           'sig_ga_account'  => '',
           'sig_ga_p12'      => '',
-          'sig_ga_id'       => ''
+          'sig_ga_id'       => '',
+          'sig_ga_nums'     => 0,
         );
         $instance = wp_parse_args( (array) $instance, $defaults );
 
      ?>
       <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_title'); ?>">標題：</label>
+        <label for="<?php echo $this->get_field_id('sig_ga_title'); ?>">自定標題：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_title'); ?>" name="<?php echo $this->get_field_name('sig_ga_title'); ?>" value="<?php echo $instance['sig_ga_title']; ?>">
       </p>
       <p>
@@ -53,7 +54,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_p12'); ?>">P12 key檔名：</label>
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_p12'); ?>" name="<?php echo $this->get_field_name('sig_ga_p12'); ?>" value="<?php echo $instance['sig_ga_p12']; ?>">
-        <small>檔案放在外掛的 p12 資料夾下。</small>
+        <small>請將檔案放在外掛的 p12 資料夾下。</small>
       </p>
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_id'); ?>">網站的 Profile ID：</label>
@@ -64,9 +65,14 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_type'); ?>">顯示類型：</label>
         <select class="widefat" size="1"  id="<?php echo $this->get_field_id('sig_ga_type'); ?>" name="<?php echo $this->get_field_name('sig_ga_type'); ?>">
-          <option value="0" <?php if($instance['sig_ga_type']==0) echo 'selected'?>>Visit</option>
-          <option value="1" <?php if($instance['sig_ga_type']==1) echo 'selected'?>>Pageview</option>
+          <option value="0" <?php if($instance['sig_ga_type']==0) echo 'selected'?>>Visit(人次)</option>
+          <option value="1" <?php if($instance['sig_ga_type']==1) echo 'selected'?>>Pageview(頁次)</option>
         </select>
+      </p>
+
+      <p>
+        <label for="<?php echo $this->get_field_id('sig_ga_nums'); ?>">調整計次：</label>
+        <input class="widefat" placeholder="輸入起跳的數字" type="text" id="<?php echo $this->get_field_id('sig_ga_nums'); ?>" name="<?php echo $this->get_field_name('sig_ga_nums'); ?>" value="<?php echo $instance['sig_ga_nums']; ?>"  onkeyup="value=value.replace(/[^0-9]/g,'')" onbeforepaste="clipboardData.setData('text',clipboardData.getData('text').replace(/[^0-9]/g,''))">
       </p>
 
     <?php
@@ -81,6 +87,10 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         $instance['sig_ga_account']    = strip_tags( $new_instance['sig_ga_account'] );
         $instance['sig_ga_p12']        = strip_tags( $new_instance['sig_ga_p12'] );
         $instance['sig_ga_id']         = strip_tags( $new_instance['sig_ga_id'] );
+        $instance['sig_ga_nums']       = strip_tags( $new_instance['sig_ga_nums'] );
+
+        $instance['sig_ga_nums'] = preg_replace('/[^0-9]/','',$instance['sig_ga_nums']);
+        if(empty($instance['sig_ga_nums'])) $instance['sig_ga_nums'] = 0;
 
         // clear option table
         global $wpdb;
@@ -99,6 +109,7 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         $sig_ga_account = $instance['sig_ga_account'];
         $sig_ga_p12     = $instance['sig_ga_p12'];
         $sig_ga_id      = $instance['sig_ga_id'];
+        $sig_ga_nums    = $instance['sig_ga_nums'];
 
         if( !empty($sig_ga_account) and !empty($sig_ga_p12) and !empty($sig_ga_id) )
         {
@@ -145,8 +156,8 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
           echo $before_widget;
           echo $before_title . $sig_ga_title . $after_title;
-          echo '<div>本日人氣：'.$today.'</div>';
-          echo '<div>累積人氣：'.$all.'</div>';
+          echo '<div>本日人氣：'.number_format($today).'</div>';
+          echo '<div>累積人氣：'.number_format($all+$sig_ga_nums).'</div>';
           echo $after_widget;
         }
     }
