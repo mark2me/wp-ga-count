@@ -196,7 +196,7 @@ function add_ga_info_page() {
 	  date('Y-m-01'),
 	  date('Y-m-d'),
 	  1,
-	  500
+	  10000
   );
   $ga = get_api('',$data);
 
@@ -312,7 +312,8 @@ function updata_today($instance,$new=1)
       '',
       date('Y-m-d'),
       date('Y-m-d'),
-      1
+      1,
+      10000
     );
 
     $ga = get_api($instance,$data);
@@ -349,7 +350,8 @@ function updata_tol($instance,$new=1)
       '',
       '',
       date('Y-m-d',strtotime("-1 days")),
-      1
+      1,
+      10000
     );
 
     $ga = get_api($instance,$data);
