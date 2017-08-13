@@ -3,16 +3,27 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.1.0
+Version: 1.2.0
 Author: Simon Chuang
 Author URI: http://webdesign.sig.tw
-
 */
 
 define( 'SIG_GA_DIR', dirname(__FILE__) );
 define( 'SIG_GA_WIDGET', 'sig-show-pageview');   // widget dom id
 define( 'SIG_GA_KEY_PATH', SIG_GA_DIR.'/p12/');  //p12檔存放位置
 define( 'SIG_GA_CACHE', 600); //今日人氣暫存時間(秒數)
+define( 'SIG_GA_CONFIG', 'sig-ga-config');   // widget dom id
+define( 'SIG_GA_POST_VIEW', 'views');
+
+
+function sig_plugin_settings_link($links) {
+  $settings_link = '<a href="options-general.php?page=sig-ga-account">'.__( 'Settings' ).'</a>';
+  array_unshift($links, $settings_link);
+  return $links;
+}
+
+$plugin = plugin_basename(__FILE__);
+add_filter("plugin_action_links_$plugin", 'sig_plugin_settings_link' );
 
 /*-----------------------------------------------
 * add WP_Widget
@@ -34,9 +45,6 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         $defaults = array(
           'sig_ga_title'    => '參觀人氣',
           'sig_ga_type'     => 0,
-          'sig_ga_account'  => '',
-          'sig_ga_p12'      => '',
-          'sig_ga_id'       => '',
           'sig_ga_nums'     => 0,
         );
         $instance = wp_parse_args( (array) $instance, $defaults );
@@ -47,29 +55,12 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_title'); ?>" name="<?php echo $this->get_field_name('sig_ga_title'); ?>" value="<?php echo $instance['sig_ga_title']; ?>">
       </p>
       <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_account'); ?>">GA授權服務帳號：</label>
-        <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_account'); ?>" name="<?php echo $this->get_field_name('sig_ga_account'); ?>" value="<?php echo $instance['sig_ga_account']; ?>">
-        <small>到 <a href="https://console.developers.google.com/" target="_blank">Google Developers</a> 申請，並下載p12檔案。再把這個服務帳號加入 Google Analytics 你的站台管理員，權限要可檢視和分析。 </small>
-      </p>
-      <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_p12'); ?>">P12 key檔名：</label>
-        <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_p12'); ?>" name="<?php echo $this->get_field_name('sig_ga_p12'); ?>" value="<?php echo $instance['sig_ga_p12']; ?>">
-        <small>請將檔案放在外掛的 p12 資料夾下。</small>
-      </p>
-      <p>
-        <label for="<?php echo $this->get_field_id('sig_ga_id'); ?>">網站的 Profile ID：</label>
-        <input class="widefat" type="text" id="<?php echo $this->get_field_id('sig_ga_id'); ?>" name="<?php echo $this->get_field_name('sig_ga_id'); ?>" value="<?php echo $instance['sig_ga_id']; ?>">
-        <small>到你的 Google Analytics 中，切換到你的站台，在瀏覽器的URL應該是這樣子『https://www.google.com/analytics/web/#report/visitors-overview/a1234b23478970 p1234567/』，找最後 p 之後的數字1234567</small>
-      </p>
-
-      <p>
         <label for="<?php echo $this->get_field_id('sig_ga_type'); ?>">顯示類型：</label>
         <select class="widefat" size="1"  id="<?php echo $this->get_field_id('sig_ga_type'); ?>" name="<?php echo $this->get_field_name('sig_ga_type'); ?>">
           <option value="0" <?php if($instance['sig_ga_type']==0) echo 'selected'?>>Visit(人次)</option>
           <option value="1" <?php if($instance['sig_ga_type']==1) echo 'selected'?>>Pageview(頁次)</option>
         </select>
       </p>
-
       <p>
         <label for="<?php echo $this->get_field_id('sig_ga_nums'); ?>">調整計次：</label>
         <input class="widefat" placeholder="輸入起跳的數字" type="text" id="<?php echo $this->get_field_id('sig_ga_nums'); ?>" name="<?php echo $this->get_field_name('sig_ga_nums'); ?>" value="<?php echo $instance['sig_ga_nums']; ?>"  onkeyup="value=value.replace(/[^0-9]/g,'')" onbeforepaste="clipboardData.setData('text',clipboardData.getData('text').replace(/[^0-9]/g,''))">
@@ -84,18 +75,10 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
         $instance['sig_ga_title']      = strip_tags( $new_instance['sig_ga_title'] );
         $instance['sig_ga_type']       = strip_tags( $new_instance['sig_ga_type'] );
-        $instance['sig_ga_account']    = strip_tags( $new_instance['sig_ga_account'] );
-        $instance['sig_ga_p12']        = strip_tags( $new_instance['sig_ga_p12'] );
-        $instance['sig_ga_id']         = strip_tags( $new_instance['sig_ga_id'] );
         $instance['sig_ga_nums']       = strip_tags( $new_instance['sig_ga_nums'] );
 
         $instance['sig_ga_nums'] = preg_replace('/[^0-9]/','',$instance['sig_ga_nums']);
         if(empty($instance['sig_ga_nums'])) $instance['sig_ga_nums'] = 0;
-
-        // clear option table
-        global $wpdb;
-        $sql = "DELETE FROM `".$wpdb->prefix."options` WHERE `option_name` like 'sig_ga_%_$instance[sig_ga_id]'";
-        $wpdb->query( $sql );
 
         return $instance;
     }
@@ -106,60 +89,76 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
 
         $sig_ga_title   = $instance['sig_ga_title'];
         $sig_ga_type    = $instance['sig_ga_type'];
-        $sig_ga_account = $instance['sig_ga_account'];
-        $sig_ga_p12     = $instance['sig_ga_p12'];
-        $sig_ga_id      = $instance['sig_ga_id'];
         $sig_ga_nums    = $instance['sig_ga_nums'];
 
-        if( !empty($sig_ga_account) and !empty($sig_ga_p12) and !empty($sig_ga_id) )
+        $config = get_ga_config();
+
+        if( $config !== false )
         {
-          //-----today------
-          $data = get_option('sig_ga_today_'.$sig_ga_id);
+          $sig_ga_account   = $config['sig_ga_account'];
+          $sig_ga_p12       = $config['sig_ga_p12'];
+          $sig_ga_id        = $config['sig_ga_id'];
 
-          if(empty($data) or $data === '' )
+          if( !empty($sig_ga_account) and !empty($sig_ga_p12) and !empty($sig_ga_id) )
           {
-            $data = updata_today($instance,1);
+            //-----today------
+            $data = get_option('sig_ga_today_'.$sig_ga_id);
+
+            if(empty($data) or $data === '' )
+            {
+              $data = updata_today($sig_ga_id,1);
+            }
+            else
+            {
+              if( (time() - $data['time']) > SIG_GA_CACHE ){
+                $data = updata_today($sig_ga_id,0);
+              }
+            }
+
+            if($sig_ga_type==1){
+              $today = (isset($data['pageview'])) ? $data['pageview'] : 0;
+            }else{
+              $today = (isset($data['visit'])) ? $data['visit'] : 0;
+            }
+
+            //------ all --------
+            $data = get_option('sig_ga_tol_'.$sig_ga_id);
+
+            if(empty($data) or $data === '' )
+            {
+              $data = updata_tol($sig_ga_id,1);
+            }
+            else
+            {
+              if( date('Y-m-d',strtotime("-1 days")) !== $data['end'] ) {
+                $data = updata_tol($sig_ga_id,0);
+              }
+            }
+
+            if($sig_ga_type==1){
+              $all = (isset($data['pageview'])) ? $data['pageview'] : 0;
+            }else{
+              $all = (isset($data['visit'])) ? $data['visit'] : 0;
+            }
+
+
+            echo $before_widget;
+            echo $before_title . $sig_ga_title . $after_title;
+            echo '<div>本日人氣：'.number_format($today).'</div>';
+            echo '<div>累積人氣：'.number_format($all+$sig_ga_nums).'</div>';
+            echo $after_widget;
           }
           else
           {
-            if( (time() - $data['time']) > SIG_GA_CACHE ){
-              $data = updata_today($instance,0);
-            }
+            echo 'building...';
           }
 
-          if($sig_ga_type==1){
-            $today = (isset($data['pageview'])) ? $data['pageview'] : 0;
-          }else{
-            $today = (isset($data['visit'])) ? $data['visit'] : 0;
-          }
-
-          //------ all --------
-          $data = get_option('sig_ga_tol_'.$sig_ga_id);
-
-          if(empty($data) or $data === '' )
-          {
-            $data = updata_tol($instance,1);
-          }
-          else
-          {
-            if( date('Y-m-d',strtotime("-1 days")) !== $data['end'] ) {
-              $data = updata_tol($instance,0);
-            }
-          }
-
-          if($sig_ga_type==1){
-            $all = (isset($data['pageview'])) ? $data['pageview'] : 0;
-          }else{
-            $all = (isset($data['visit'])) ? $data['visit'] : 0;
-          }
-
-
-          echo $before_widget;
-          echo $before_title . $sig_ga_title . $after_title;
-          echo '<div>本日人氣：'.number_format($today).'</div>';
-          echo '<div>累積人氣：'.number_format($all+$sig_ga_nums).'</div>';
-          echo $after_widget;
         }
+        else
+        {
+          echo 'setuping...';
+        }
+
     }
 }
 
@@ -171,20 +170,23 @@ function sig_register_ga_widget() {
 
 
 /*-----------------------------------------------
-*  show Ga page
+*  show this month
 -----------------------------------------------*/
-add_action( 'admin_enqueue_scripts', 'theme_name_scripts' );
-function theme_name_scripts() {
+function theme_name_scripts($hook) {
+
+  if($hook != 'toplevel_page_view-ga')  return;
+
   wp_enqueue_style( 'chart', plugin_dir_url(__FILE__) . 'js/morris.css' );
   wp_enqueue_script( 'raphael', plugin_dir_url(__FILE__) . 'js/raphael-min.js',array('jquery') );
   wp_enqueue_script('chart', plugin_dir_url(__FILE__) . 'js/morris.min.js',array('jquery'));
 }
+add_action( 'admin_enqueue_scripts', 'theme_name_scripts' );
 
-
-add_action('admin_menu', 'add_ga_view_menu');
 function add_ga_view_menu(){
   add_menu_page('查看本月份的瀏覽人次統計表','本月份GA','administrator','view-ga', 'add_ga_info_page');
 }
+add_action('admin_menu', 'add_ga_view_menu');
+
 
 function add_ga_info_page() {
 
@@ -198,12 +200,13 @@ function add_ga_info_page() {
 	  1,
 	  10000
   );
-  $ga = get_api('',$data);
+  $ga = get_api($data);
 
   if( !is_object($ga) )
   {
-    echo '<h1>是否還沒新增小工具？</h1>';
-    echo '<p>'.$ga.'</p>';
+    echo '<div class="wrap"><h1>是否還沒設定GA服務帳號？</h1></div>';
+    echo '<a href="/wp-admin/options-general.php?page=sig-ga-account" class="button button-primary widgets-chooser-add">立刻去新增</a>';
+    if(!empty($ga)) echo '<p>相關訊息：<br>'.$ga.'</p>';
   }
   else
   {
@@ -211,7 +214,7 @@ function add_ga_info_page() {
 ?>
   <h1><?php echo '從 '.date('Y-m-01').' 到 '.date('Y-m-d')?></h1>
   <div id="mychart" style="height: 250px;"></div>
-  <table>
+  <table class="">
   <tr>
     <th>Total Results</th>
     <td><?php echo $ga->getTotalResults() ?></td>
@@ -253,24 +256,19 @@ function add_ga_info_page() {
 
 }
 
-function get_api($config=array(),$data)
+/*-------------------------------------------
+* call api
+/*------------------------------------------*/
+function get_api($data='')
 {
+  $config = get_ga_config();
 
-  if( empty($config) )
-  {
-    $w = new Sig_Ga_Count_Widget();
-    $settings = $w->get_settings();
-    $settings = reset($settings);
-
-    $account  = $settings['sig_ga_account'];
-    $p12      = $settings['sig_ga_p12'];
-    $report_id= $settings['sig_ga_id'];
-  }
-  else
-  {
+  if( $config !== false ){
     $account  = $config['sig_ga_account'];
     $p12      = $config['sig_ga_p12'];
     $report_id= $config['sig_ga_id'];
+  }else{
+    return false;
   }
 
   if( empty($account) or empty($p12) or empty($report_id) )
@@ -302,7 +300,7 @@ function get_api($config=array(),$data)
   }
 }
 
-function updata_today($instance,$new=1)
+function updata_today($sig_ga_id,$new=1)
 {
     // today
     $data = array(
@@ -316,7 +314,7 @@ function updata_today($instance,$new=1)
       10000
     );
 
-    $ga = get_api($instance,$data);
+    $ga = get_api($data);
 
     if( is_object($ga) )
     {
@@ -327,9 +325,9 @@ function updata_today($instance,$new=1)
       );
 
       if($new){
-        add_option( 'sig_ga_today_'.$instance['sig_ga_id'], $option, '', 'no' );
+        add_option( 'sig_ga_today_'.$sig_ga_id, $option, '', 'no' );
       }else{
-        update_option( 'sig_ga_today_'.$instance['sig_ga_id'], $option);
+        update_option( 'sig_ga_today_'.$sig_ga_id, $option);
       }
     }
     else
@@ -341,7 +339,7 @@ function updata_today($instance,$new=1)
 
 }
 
-function updata_tol($instance,$new=1)
+function updata_tol($sig_ga_id,$new=1)
 {
     $data = array(
       array('date'),
@@ -354,7 +352,7 @@ function updata_tol($instance,$new=1)
       10000
     );
 
-    $ga = get_api($instance,$data);
+    $ga = get_api($data);
 
     if( is_object($ga) )
     {
@@ -366,9 +364,9 @@ function updata_tol($instance,$new=1)
       );
 
       if($new){
-        add_option( 'sig_ga_tol_'.$instance['sig_ga_id'], $option, '', 'no' );
+        add_option( 'sig_ga_tol_'.$sig_ga_id, $option, '', 'no' );
       }else{
-        update_option( 'sig_ga_tol_'.$instance['sig_ga_id'], $option);
+        update_option( 'sig_ga_tol_'.$sig_ga_id, $option);
       }
     }
     else
@@ -379,3 +377,143 @@ function updata_tol($instance,$new=1)
     return $option;
 
 }
+
+/*-----------------------------------------------
+  show GA on page
+-----------------------------------------------*/
+function show_post_count($content)
+{
+  if( !is_single() ) return;
+
+  $config = get_ga_config();
+
+  if( $config === false ){
+    return $content;
+  }else{
+    if( isset($config['sig_show_post']) and $config['sig_show_post'] == 1 ){
+      //
+    }else{
+      return $content;
+    }
+  }
+
+  global $post;
+  $post_id = $post->ID;
+
+  $path = wp_make_link_relative(get_permalink($post_id));
+  $path = urldecode($path);
+
+  $data = array(
+    array('pagePath'),
+    array('pageViews','UniquePageviews'),
+    'pageViews',
+    'ga:pagePath=='.$path,
+    '',
+    date('Y-m-d'),
+    1
+  );
+
+  $ga = get_api($data);
+
+  if( is_object($ga) )
+  {
+    $view = $ga->getPageviews();
+  }
+  else
+  {
+    $view = '?';
+  }
+
+  return '<p>瀏覽次數：'.$view.'</p>'.$content;
+}
+
+add_filter('the_content','show_post_count',10,1);
+
+
+/*-----------------------------------------------
+*  GA config
+-----------------------------------------------*/
+function get_ga_config()
+{
+  $config = get_option(SIG_GA_CONFIG);
+  if( is_array($config) ){
+    return $config;
+  }else{
+    return false;
+  }
+}
+
+add_action('admin_menu', 'sig_ga_option_menu');
+
+function sig_ga_option_menu(){
+  add_options_page('設定GA服務帳號的參數','GA服務帳號','administrator','sig-ga-account', 'sig_ga_settings_page');
+  add_action( 'admin_init', 'sig_register_ga_opt_var' );
+}
+
+function sig_register_ga_opt_var() {
+  register_setting( 'sig-ga-option-group',SIG_GA_CONFIG );
+}
+
+function sig_ga_settings_page() {
+
+  $config = get_option(SIG_GA_CONFIG);
+  $alert = false;
+
+  if(empty($config))
+  {
+    $old = get_option('widget_'.SIG_GA_WIDGET);
+    if( !empty($old) and count($old) > 1){
+      $config = array_shift($old);
+      if(isset($config['sig_ga_account'])) $alert = true;
+    }
+  }
+
+?>
+<div class="wrap">
+  <h2>設定GA必要的參數</h2>
+  <form method="post" action="options.php">
+    <?php settings_fields('sig-ga-option-group'); ?>
+    <?php do_settings_sections( 'sig-ga-option-group' ); ?>
+    <table class="form-table">
+      <tr valign="top">
+        <th scope="row">GA授權服務帳號：</th>
+        <td><input type="text" class="regular-text" name="<?php echo SIG_GA_CONFIG?>[sig_ga_account]" value="<?php echo esc_attr( $config['sig_ga_account'] ); ?>" />
+        <p class="description">到 <a href="https://console.developers.google.com/" target="_blank">Google Developers</a> 申請，並下載p12檔案。再把這個服務帳號加入 Google Analytics 你的站台管理員，權限要可檢視和分析。 </p>
+        </td>
+      </tr>
+
+      <tr valign="top">
+        <th scope="row">P12 key檔名：</th>
+        <td><input type="text" class="regular-text" name="<?php echo SIG_GA_CONFIG?>[sig_ga_p12]" value="<?php echo esc_attr( $config['sig_ga_p12'] ); ?>" />
+        <p class="description">請將檔案放在外掛的 p12 資料夾下。</p>
+        </td>
+      </tr>
+
+      <tr valign="top">
+        <th scope="row">網站的 Profile ID：</th>
+        <td><input type="text" class="" name="<?php echo SIG_GA_CONFIG?>[sig_ga_id]" value="<?php echo esc_attr( $config['sig_ga_id'] ); ?>" />
+        <p class="description">到你的 Google Analytics 中，切換到你的站台，在瀏覽器的URL應該是這樣子『https://www.google.com/analytics/web/#report/visitors-overview/a1234b23478970 p1234567/』，找最後 p 之後的數字1234567</p>
+        </td>
+      </tr>
+
+      <tr valign="top">
+        <th scope="row">網頁文章瀏覽次數</th>
+        <td>
+          <fieldset>
+            <legend class="screen-reader-text"><span>網頁文章瀏覽次數</span></legend>
+            <p>
+              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="0" type="radio" <?php if($config['sig_show_post']=='0') echo 'checked="checked"'?>> 不要顯示</label><br>
+              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="1" type="radio" <?php if($config['sig_show_post']=='1') echo 'checked="checked"'?>> 顯示次數</label>
+            </p>
+          </fieldset>
+        </td>
+      </tr>
+      </table>
+
+      <?php submit_button(); ?>
+      <?php if($alert) echo '(第一次設定，以上資料來自小工具設定，請按下儲存按鈕做轉換儲存。)'?>
+  </form>
+</div>
+<?
+}
+
