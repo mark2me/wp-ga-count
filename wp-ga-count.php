@@ -3,9 +3,8 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.2.0
+Version: 1.2.1
 Author: Simon Chuang
-Author URI: http://webdesign.sig.tw
 */
 
 define( 'SIG_GA_DIR', dirname(__FILE__) );

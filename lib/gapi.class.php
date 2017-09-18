@@ -1,29 +1,29 @@
 <?php
 /**
  * GAPI - Google Analytics PHP Interface
- * 
+ *
  * http://code.google.com/p/gapi-google-analytics-php-interface/
- * 
+ *
  * @copyright Stig Manning 2009
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * @author Stig Manning <stig@sdm.co.nz>
  * @author Joel Kitching <jkitching@mailbolt.com>
  * @author Cliff Gordon <clifton.gordon@gmail.com>
  * @version 2.0
- * 
+ *
  */
 
 class gapi {
@@ -106,9 +106,9 @@ class gapi {
    * Request report data from Google Analytics
    *
    * $report_id is the Google report ID for the selected account
-   * 
+   *
    * $parameters should be in key => value format
-   * 
+   *
    * @param String $report_id
    * @param Array $dimensions Google Analytics dimensions e.g. array('browser')
    * @param Array $metrics Google Analytics metrics e.g. array('pageviews')
@@ -197,7 +197,7 @@ class gapi {
     $parameters['max-results'] = $max_results;
 
     $parameters['prettyprint'] = gapi::dev_mode ? 'true' : 'false';
-    
+
     $url = new gapiRequest(gapi::report_data_url);
     $response = $url->get($parameters, $this->auth_method->generateAuthHeader());
 
@@ -208,10 +208,10 @@ class gapi {
       throw new Exception('GAPI: Failed to request report data. Error: "' . $this->cleanErrorResponse($response['body']) . '"');
     }
   }
-  
+
   /**
    * Clean error message from Google API
-   * 
+   *
    * @param String $error Error message HTML or JSON from Google API
    */
   private function cleanErrorResponse($error) {
@@ -229,7 +229,7 @@ class gapi {
   /**
    * Process filter string, clean parameters and convert to Google Analytics
    * compatible format
-   * 
+   *
    * @param String $filter
    * @return String Compatible filter string
    */
@@ -379,12 +379,12 @@ class gapi {
   }
 
   /**
-   * Call method to find a matching root parameter or 
+   * Call method to find a matching root parameter or
    * aggregate metric to return
    *
    * @param $name String name of function called
    * @return String
-   * @throws Exception if not a valid parameter or aggregate 
+   * @throws Exception if not a valid parameter or aggregate
    * metric, or not a 'get' function
    */
   public function __call($name, $parameters) {
@@ -408,7 +408,7 @@ class gapi {
 
     throw new Exception('No valid root parameter or aggregate metric called "' . $name . '"');
   }
-  
+
   /**
    * Case insensitive array_key_exists function, also returns
    * matching key.
@@ -443,7 +443,7 @@ class gapiAccountEntry {
 
   /**
    * Constructor function for all new gapiAccountEntry instances
-   * 
+   *
    * @param Array $properties
    * @return gapiAccountEntry
    */
@@ -505,7 +505,7 @@ class gapiReportEntry {
 
   /**
    * Constructor function for all new gapiReportEntry instances
-   * 
+   *
    * @param Array $metrics
    * @param Array $dimensions
    * @return gapiReportEntry
@@ -518,14 +518,14 @@ class gapiReportEntry {
   /**
    * toString function to return the name of the result
    * this is a concatented string of the dimensions chosen
-   * 
+   *
    * For example:
    * 'Firefox 3.0.10' from browser and browserVersion
    *
    * @return String
    */
   public function __toString() {
-    return is_array($this->dimensions) ? 
+    return is_array($this->dimensions) ?
       implode(' ', $this->dimensions) : '';
   }
 
@@ -597,7 +597,7 @@ class gapiOAuth2 {
 
   private function base64URLDecode($data) {
     return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
-  } 
+  }
 
   /**
    * Authenticate Google Account with OAuth2
@@ -636,7 +636,7 @@ class gapiOAuth2 {
     }
 
     $key_data = file_get_contents($key_file);
-    
+
     if (empty($key_data)) {
       throw new Exception('GAPI: Failed load key file "' . $key_file . '". File could not be opened or is empty.');
     }
@@ -675,7 +675,7 @@ class gapiOAuth2 {
   public function getToken() {
     return $this->auth_token;
   }
-  
+
   /**
    * Generate authorization token header for all requests
    *
@@ -721,7 +721,7 @@ class gapiRequest {
 
   /**
    * Perform http POST request
-   * 
+   *
    *
    * @param Array $get_variables
    * @param Array $post_variables
@@ -733,7 +733,7 @@ class gapiRequest {
 
   /**
    * Perform http GET request
-   * 
+   *
    *
    * @param Array $get_variables
    * @param Array $headers
@@ -744,7 +744,7 @@ class gapiRequest {
 
   /**
    * Perform http request
-   * 
+   *
    *
    * @param Array $get_variables
    * @param Array $post_variables
@@ -769,44 +769,47 @@ class gapiRequest {
   /**
    * HTTP request using PHP CURL functions
    * Requires curl library installed and configured for PHP
-   * 
+   *
    * @param Array $get_variables
    * @param Array $post_variables
    * @param Array $headers
    */
   private function curlRequest($get_variables=null, $post_variables=null, $headers=null) {
-    $ch = curl_init();
 
-    if (is_array($get_variables)) {
-      $get_variables = '?' . str_replace('&amp;', '&', urldecode(http_build_query($get_variables, '', '&')));
-    } else {
-      $get_variables = null;
-    }
+    if( $post_variables !== null and is_array($post_variables) ){
 
-    curl_setopt($ch, CURLOPT_URL, $this->url . $get_variables);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //CURL doesn't like google's cert
+      $args = array(
+        'body' => $post_variables,
+        'cookies' => array()
+      );
 
-    if (is_array($post_variables)) {
-      curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_variables, '', '&'));
-    }
+      $response = wp_remote_post($this->url . $get_variables, $args );
+      $code = wp_remote_retrieve_response_code( $response );
 
-    if (is_array($headers)) {
-      $string_headers = array();
-      foreach ($headers as $key => $value) {
-        $string_headers[] = "$key: $value";
+      $response = $response['body'];
+
+    }else{
+
+      if (is_array($get_variables)) {
+        $get_variables = '?' . str_replace('&amp;', '&', urldecode(http_build_query($get_variables, '', '&')));
+      } else {
+        $get_variables = null;
       }
-      curl_setopt($ch, CURLOPT_HTTPHEADER, $string_headers);
+
+      $args = array(
+        'headers' => $headers,
+      );
+      $response = wp_remote_get($this->url . $get_variables,$args);
+      $code = wp_remote_retrieve_response_code( $response );
+
+      $response = $response['body'];
+
     }
-
-    $response = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    curl_close($ch);
 
     return array('body' => $response, 'code' => $code);
   }
+
+
 
   /**
    * HTTP request using native PHP fopen function
