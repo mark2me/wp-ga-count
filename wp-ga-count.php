@@ -3,15 +3,14 @@
 Plugin Name: Show Google Analytics widget
 Plugin URI: http://webdesign.sig.tw
 Description: 像痞客邦的顯示今日參觀人數和總參觀人數的小工具
-Version: 1.2.1
+Version: 1.2.5
 Author: Simon Chuang
 */
 
 define( 'SIG_GA_DIR', dirname(__FILE__) );
-define( 'SIG_GA_WIDGET', 'sig-show-pageview');   // widget dom id
-define( 'SIG_GA_KEY_PATH', SIG_GA_DIR.'/p12/');  //p12檔存放位置
-define( 'SIG_GA_CACHE', 600); //今日人氣暫存時間(秒數)
-define( 'SIG_GA_CONFIG', 'sig-ga-config');   // widget dom id
+define( 'SIG_GA_WIDGET', 'sig-show-pageview');    // widget dom id
+define( 'SIG_GA_CACHE', 600);                     // today visit cache time
+define( 'SIG_GA_CONFIG', 'sig-ga-config');
 define( 'SIG_GA_POST_VIEW', 'views');
 
 
@@ -95,10 +94,10 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
         if( $config !== false )
         {
           $sig_ga_account   = $config['sig_ga_account'];
-          $sig_ga_p12       = $config['sig_ga_p12'];
+          $sig_ga_upload    = $config['sig_ga_upload']; //p12
           $sig_ga_id        = $config['sig_ga_id'];
 
-          if( !empty($sig_ga_account) and !empty($sig_ga_p12) and !empty($sig_ga_id) )
+          if( !empty($sig_ga_account) and !empty($sig_ga_upload) and !empty($sig_ga_id) )
           {
             //-----today------
             $data = get_option('sig_ga_today_'.$sig_ga_id);
@@ -109,7 +108,8 @@ class  Sig_Ga_Count_Widget extends WP_Widget {
             }
             else
             {
-              if( (time() - $data['time']) > SIG_GA_CACHE ){
+              $cache_time = (!empty($config['sig_ga_cache']) and $config['sig_ga_cache'] > 0) ? $config['sig_ga_cache']:SIG_GA_CACHE;
+              if( (time() - $data['time']) > $cache_time ){
                 $data = updata_today($sig_ga_id,0);
               }
             }
@@ -264,7 +264,7 @@ function get_api($data='')
 
   if( $config !== false ){
     $account  = $config['sig_ga_account'];
-    $p12      = $config['sig_ga_p12'];
+    $p12      = $config['sig_ga_upload'];
     $report_id= $config['sig_ga_id'];
   }else{
     return false;
@@ -282,7 +282,12 @@ function get_api($data='')
       list($dimensions, $metrics, $sort_metric, $filter,$start_date, $end_date, $start_index, $max_results) = $data;
 
       require_once(SIG_GA_DIR.'/lib/gapi.class.php');
-      $ga = new gapi($account, SIG_GA_KEY_PATH.$p12);
+
+      if(file_exists($p12)){
+        $ga = new gapi($account, $p12);
+      }else{
+        return '<p><b>注意: 尚未將 p12 檔案上傳到網站內</b></p>';
+      }
 
       try {
         $ga->requestReportData($report_id, $dimensions, $metrics, $sort_metric, $filter,$start_date, $end_date, $start_index, $max_results);
@@ -382,7 +387,7 @@ function updata_tol($sig_ga_id,$new=1)
 -----------------------------------------------*/
 function show_post_count($content)
 {
-  if( !is_single() ) return;
+  if( !is_single() && !is_page() ) return $content;
 
   $config = get_ga_config();
 
@@ -426,7 +431,7 @@ function show_post_count($content)
   return '<p>瀏覽次數：'.$view.'</p>'.$content;
 }
 
-add_filter('the_content','show_post_count',10,1);
+add_filter('the_content','show_post_count',40,1);
 
 
 /*-----------------------------------------------
@@ -450,7 +455,20 @@ function sig_ga_option_menu(){
 }
 
 function sig_register_ga_opt_var() {
-  register_setting( 'sig-ga-option-group',SIG_GA_CONFIG );
+  register_setting( 'sig-ga-option-group',SIG_GA_CONFIG,'handle_file_upload' );
+}
+
+
+function handle_file_upload($option)
+{
+  if(!empty($_FILES["sig_ga_upload"]["tmp_name"]))
+  {
+    $temp = wp_handle_upload($_FILES["sig_ga_upload"], array('test_form' => FALSE));
+    if ( $temp && ! isset( $temp['error'] ) ) {
+      $option['sig_ga_upload'] = $temp['file'];
+    }
+  }
+  return $option;
 }
 
 function sig_ga_settings_page() {
@@ -470,9 +488,8 @@ function sig_ga_settings_page() {
 ?>
 <div class="wrap">
   <h2>設定GA必要的參數</h2>
-  <form method="post" action="options.php">
+  <form method="post" action="options.php" enctype="multipart/form-data">
     <?php settings_fields('sig-ga-option-group'); ?>
-    <?php do_settings_sections( 'sig-ga-option-group' ); ?>
     <table class="form-table">
       <tr valign="top">
         <th scope="row">GA授權服務帳號：</th>
@@ -482,9 +499,23 @@ function sig_ga_settings_page() {
       </tr>
 
       <tr valign="top">
-        <th scope="row">P12 key檔名：</th>
-        <td><input type="text" class="regular-text" name="<?php echo SIG_GA_CONFIG?>[sig_ga_p12]" value="<?php echo esc_attr( $config['sig_ga_p12'] ); ?>" />
-        <p class="description">請將檔案放在外掛的 p12 資料夾下。</p>
+        <th scope="row">上傳 P12 key檔：</th>
+        <td><input type="file" class="regular-text" name="sig_ga_upload" />
+          <p class="description"><?php
+            if( isset($config['sig_ga_upload']) and $config['sig_ga_upload'] !==''){
+              echo '目前檔案位置：'.$config['sig_ga_upload'];
+              echo '<input type="hidden" name="'.SIG_GA_CONFIG.'[sig_ga_upload]" value="'.$config['sig_ga_upload'].'">';
+            }else{
+              echo '你可以先自行更改檔名再上傳。';
+            }
+             ?></p>
+        </td>
+      </tr>
+
+      <tr valign="top">
+        <th scope="row">當日人次暫存時間：</th>
+        <td><input type="text" class="" name="<?php echo SIG_GA_CONFIG?>[sig_ga_cache]" value="<?php echo (empty(!$config['sig_ga_cache'])) ? esc_attr( $config['sig_ga_cache'] ) : SIG_GA_CACHE ; ?>"  onkeyup="value=value.replace(/[^\d.]/g,'')" onbeforepaste="clipboardData.setData('text',clipboardData.getData('text').replace(/[^\d.]/g,''))">秒
+        <p class="description">預設時間為600秒，過短的時間有可能造成網頁開啟過於緩慢。</p>
         </td>
       </tr>
 
@@ -496,15 +527,16 @@ function sig_ga_settings_page() {
       </tr>
 
       <tr valign="top">
-        <th scope="row">網頁文章瀏覽次數</th>
+        <th scope="row">文章瀏覽次數</th>
         <td>
           <fieldset>
-            <legend class="screen-reader-text"><span>網頁文章瀏覽次數</span></legend>
+            <legend class="screen-reader-text"><span>文章瀏覽次數</span></legend>
             <p>
-              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="0" type="radio" <?php if($config['sig_show_post']=='0') echo 'checked="checked"'?>> 不要顯示</label><br>
-              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="1" type="radio" <?php if($config['sig_show_post']=='1') echo 'checked="checked"'?>> 顯示次數</label>
+              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="0" type="radio" <?php if($config['sig_show_post']=='0') echo 'checked="checked"'?>> 關閉</label><br>
+              <label><input name="<?php echo SIG_GA_CONFIG?>[sig_show_post]" value="1" type="radio" <?php if($config['sig_show_post']=='1') echo 'checked="checked"'?>> 開啟</label>
             </p>
           </fieldset>
+          <p class="description">(開啟本功能，可能會跟某些佈景衝突)</p>
         </td>
       </tr>
       </table>
@@ -513,6 +545,13 @@ function sig_ga_settings_page() {
       <?php if($alert) echo '(第一次設定，以上資料來自小工具設定，請按下儲存按鈕做轉換儲存。)'?>
   </form>
 </div>
-<?
+<?php
 }
 
+
+add_filter('upload_mimes', 'custom_upload_mimes');
+function custom_upload_mimes ( $existing_mimes=array() )
+{
+  $existing_mimes['p12'] = 'application/x-pkcs12';
+  return $existing_mimes;
+}
